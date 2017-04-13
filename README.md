@@ -1,5 +1,7 @@
 #  PostgreSQL
 
+[![Build Status](https://travis-ci.org/dockerlabs/postgres.svg?branch=master)](https://travis-ci.org/dockerlabs/postgres) [![Docker Automated buil](https://img.shields.io/docker/automated/mongkok/postgres.svg)](https://hub.docker.com/r/mongkok/postgres)
+
 ### Usage
 
 **Databse**
