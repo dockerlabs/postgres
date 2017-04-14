@@ -1,0 +1,181 @@
+#!/bin/bash
+set -e
+
+REPLICATION_PORT=${REPLICATION_PORT:-5432}
+
+case $REPLICATION_MODE in
+  slave|snapshot|backup)
+    gosu postgres pg_ctl -D "$PGDATA" -w stop >/dev/null
+    export PGDATA="$PGDATA/../replica"
+    mkdir -p "$PGDATA"
+    chown postgres "$PGDATA"
+    chmod 700 "$PGDATA"
+    ;;
+esac
+
+PG_CONF=${PGDATA}/postgresql.conf
+PG_HBA_CONF=${PGDATA}/pg_hba.conf
+PG_RECOVERY_CONF=${PGDATA}/recovery.conf
+PG_LOGDIR=/var/log/postgresql
+PG_BINDIR=/usr/lib/postgresql/${PG_MAJOR}/bin
+
+
+set_postgresql_param() {
+  local key=${1}
+  local value=${2}
+  local verbosity=${3:-verbose}
+
+  if [[ -n ${value} ]]; then
+    local current=$(sed -n -e "s/^\(${key} = '\)\([^ ']*\)\(.*\)$/\2/p" ${PG_CONF})
+    if [[ "${current}" != "${value}" ]]; then
+      if [[ ${verbosity} == verbose ]]; then
+        echo "‣ Setting postgresql.conf parameter: ${key} = '${value}'"
+      fi
+      value="$(echo "${value}" | sed 's|[&]|\\&|g')"
+      sed -i "s|^[#]*[ ]*${key} = .*|${key} = '${value}'|" ${PG_CONF}
+    fi
+  fi
+}
+
+set_hba_param() {
+  local value=${1}
+  if ! grep -q "$(sed "s| | \\\+|g" <<< ${value})" ${PG_HBA_CONF}; then
+    echo "${value}" >> ${PG_HBA_CONF}
+  fi
+}
+
+set_recovery_param() {
+  local key=${1}
+  local value=${2}
+  local hide=${3}
+
+  if [[ -n ${value} ]]; then
+    local current=$(sed -n -e "s/^\(.*\)\(${key}=\)\([^ ']*\)\(.*\)$/\3/p" ${PG_RECOVERY_CONF})
+    if [[ "${current}" != "${value}" ]]; then
+      case ${hide} in
+        true)  echo "‣ Setting primary_conninfo parameter: ${key}" ;;
+        *) echo "‣ Setting primary_conninfo parameter: ${key} = '${value}'" ;;
+      esac
+      sed -i "s|${key}=[^ ']*|${key}=${value}|" ${PG_RECOVERY_CONF}
+    fi
+  fi
+}
+
+configure_recovery() {
+  if [[ ${REPLICATION_MODE} == slave ]]; then
+    echo "Configuring recovery..."
+    if [[ ! -f ${PG_RECOVERY_CONF} ]]; then
+      gosu postgres touch ${PG_RECOVERY_CONF}
+      ( echo "standby_mode = 'on'";
+        echo "primary_conninfo = 'host=${REPLICATION_HOST} port=${REPLICATION_PORT} user=${REPLICATION_USER} password=${REPLICATION_PASS}'";
+      ) > ${PG_RECOVERY_CONF}
+    else
+      set_recovery_param "host"      "${REPLICATION_HOST}"
+      set_recovery_param "port"      "${REPLICATION_PORT}"
+      set_recovery_param "user"      "${REPLICATION_USER}"
+      set_recovery_param "password"  "${REPLICATION_PASS}"    "true"
+    fi
+  else
+    # recovery.conf can only exist on a slave node
+    rm -rf ${PG_RECOVERY_CONF}
+  fi
+}
+
+configure_hot_standby() {
+  case ${REPLICATION_MODE} in
+    slave|snapshot|backup) ;;
+    *)
+      echo "Configuring hot standby..."
+      set_postgresql_param "wal_level" "hot_standby"
+      set_postgresql_param "max_wal_senders" "16"
+      set_postgresql_param "checkpoint_segments" "8"
+      set_postgresql_param "wal_keep_segments" "32"
+      set_postgresql_param "hot_standby" "on"
+      ;;
+  esac
+}
+
+create_replication_user() {
+  if [[ -n ${REPLICATION_USER} ]]; then
+    case $REPLICATION_MODE in
+      slave|snapshot|backup) ;;
+      *)
+        echo "Creating replication user: ${REPLICATION_USER}"
+        if [[ -z $(psql -U ${POSTGRES_USER} -Atc "SELECT 1 FROM pg_catalog.pg_user WHERE usename = '${REPLICATION_USER}'";) ]]; then
+          psql -U ${POSTGRES_USER} -c "CREATE ROLE \"${REPLICATION_USER}\" 
+            WITH REPLICATION LOGIN ENCRYPTED PASSWORD '${REPLICATION_PASS}';" >/dev/null
+        fi
+
+        set_hba_param "host replication ${REPLICATION_USER} 0.0.0.0/0 md5"
+        ;;
+    esac
+  fi
+}
+
+create_database() {
+  if [[ -n ${DB_NAME} ]]; then
+    echo "Loading $DB_NAME database"
+
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+        CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASSWORD';
+        CREATE DATABASE $DB_NAME;
+        GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
+        GRANT postgres to $DB_USER;
+        \c $DB_NAME
+        CREATE EXTENSION "hstore";
+        CREATE EXTENSION "postgis";
+        CREATE EXTENSION "uuid-ossp";
+EOSQL
+  fi
+}
+
+initialize_database() {
+  case ${REPLICATION_MODE} in
+    slave|snapshot|backup)
+      echo -n "Waiting for $REPLICATION_HOST to accept connections (60s timeout)"
+      timeout=60
+      while ! pg_isready -h $REPLICATION_HOST -p $REPLICATION_PORT -t 1 >/dev/null 2>&1
+      do
+        timeout=$(expr $timeout - 1)
+        if [[ $timeout -eq 0 ]]; then
+          echo "Timeout! Exiting..."
+          exit 1
+        fi
+        echo -n "."
+        sleep 1
+      done
+      echo
+
+      case ${REPLICATION_MODE} in
+        slave)
+          echo "Replicating initial data from $REPLICATION_HOST..."
+          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X stream -w >/dev/null"
+          ;;
+        snapshot)
+          echo "Generating a snapshot data on $REPLICATION_HOST..."
+          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null"
+          ;;
+        backup)
+          echo "Backing up data on $REPLICATION_HOST..."
+          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null"
+          exit 0
+          ;;
+      esac
+      ;;
+  esac
+
+  configure_hot_standby
+
+  # configure path to data_directory
+  set_postgresql_param "data_directory" "${PGDATA}"
+
+  # configure logging
+  set_postgresql_param "log_directory" "${PG_LOGDIR}"
+  set_postgresql_param "log_filename" "postgresql-${PG_MAJOR}-main.log"
+
+  # allow remote connections to postgresql database
+  set_hba_param "host all all 0.0.0.0/0 md5"
+}
