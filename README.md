@@ -4,16 +4,16 @@
 
 ### Usage
 
-**Databse**
+**Database**
 
 ```sh
 sudo docker run --name pg.master -i --rm \
     --network postgres \
     --env 'POSTGRES_PASSWORD=pass' \
-    --env 'DB_NAME=my-db' \
+    --env 'DB_NAME=mydb' \
     --env 'DB_USER=me' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=pass' \
+    --env 'REPLICATION_PASS=replication-pass' \
     mongkok/postgres
 ```
 
@@ -26,7 +26,7 @@ docker run --name pg.slave -i --rm \
     --env 'REPLICATION_HOST=pg.master' \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=pass'
+    --env 'REPLICATION_PASS=replication-pass'
     mongkok/postgres
 ```
 
@@ -39,7 +39,7 @@ docker run --name pg.snapshot -i --rm \
     --env 'REPLICATION_HOST=pg.master' \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=pass'
+    --env 'REPLICATION_PASS=replication-pass'
     mongkok/postgres
 ```
 
@@ -52,7 +52,7 @@ docker run --name pg.backup -i --rm \
     --env 'REPLICATION_HOST=pg.master' \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=pass' \
+    --env 'REPLICATION_PASS=replication-pass' \
     --volume /path/to/backup:/var/lib/postgresql/replica \
     mongkok/postgres
 ```
