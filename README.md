@@ -36,7 +36,7 @@ docker run --name pg.slave -itd --restart always \
     --env 'REPLICATION_HOST=pg.master' \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=replication-pass'
+    --env 'REPLICATION_PASS=replication-pass' \
     mongkok/postgres:9.6
 ```
 
@@ -49,7 +49,7 @@ docker run --name pg.snapshot -itd --restart always \
     --env 'REPLICATION_HOST=pg.master' \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
-    --env 'REPLICATION_PASS=replication-pass'
+    --env 'REPLICATION_PASS=replication-pass' \
     mongkok/postgres:9.6
 ```
 
