@@ -31,8 +31,6 @@ for version in "${versions[@]}"; do
 			set -x
 			cp functional "$version/$variant/"
 			cp init-user-db.sh "$version/$variant/"
-			sed -i 's/gosu/su-exec/g' "$version/$variant/functional"
-			sed -i 's/gosu/su-exec/g' "$version/$variant/init-user-db.sh"
 			sed -e 's/%%PG_MAJOR%%/'"$version"'/g' \
 				"Dockerfile-$variant.template" > "$version/$variant/Dockerfile"
 		)
@@ -42,5 +40,5 @@ for version in "${versions[@]}"; do
 	travisEnv='\n  - VERSION='"$version$travisEnv"
 done
 
-travis="$(awk -v 'RS=\n\n' '$1 == "env:" { $0 = "env:'"$travisEnv"'" } { printf "%s%s", $0, RS }' .travis.yml)"
+travis="$(awk -v 'RS=\n' '$1 == "env:" { $0 = "env:'"$travisEnv"'" } { printf "%s%s", $0, RS }' .travis.yml)"
 echo "$travis" > .travis.yml

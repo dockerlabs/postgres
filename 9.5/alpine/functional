@@ -5,7 +5,7 @@ REPLICATION_PORT=${REPLICATION_PORT:-5432}
 
 case $REPLICATION_MODE in
   slave|snapshot|backup)
-    su-exec postgres pg_ctl -D "$PGDATA" -w stop >/dev/null
+    pg_ctl -D "$PGDATA" -w stop >/dev/null
     export PGDATA="$PGDATA/../replica"
     mkdir -p "$PGDATA"
     chown postgres "$PGDATA"
@@ -65,7 +65,7 @@ configure_recovery() {
   if [[ ${REPLICATION_MODE} == slave ]]; then
     echo "Configuring recovery..."
     if [[ ! -f ${PG_RECOVERY_CONF} ]]; then
-      su-exec postgres touch ${PG_RECOVERY_CONF}
+      touch ${PG_RECOVERY_CONF}
       ( echo "standby_mode = 'on'";
         echo "primary_conninfo = 'host=${REPLICATION_HOST} port=${REPLICATION_PORT} user=${REPLICATION_USER} password=${REPLICATION_PASS}'";
       ) > ${PG_RECOVERY_CONF}
@@ -148,19 +148,19 @@ initialize_database() {
 
       case ${REPLICATION_MODE} in
         slave)
-          echo "Replicating initial data from $REPLICATION_HOST..."
-          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
-            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X stream -w >/dev/null"
+          echo "* Replicating initial data from $REPLICATION_HOST..."
+          PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X stream -w >/dev/null
           ;;
         snapshot)
-          echo "Generating a snapshot data on $REPLICATION_HOST..."
-          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
-            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null"
+          echo "* Generating a snapshot data on $REPLICATION_HOST..."
+          PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null
           ;;
         backup)
-          echo "Backing up data on $REPLICATION_HOST..."
-          su - postgres -c "PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
-            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null"
+          echo "* Backing up data on $REPLICATION_HOST..."
+          PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
+            -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null
           exit 0
           ;;
       esac
