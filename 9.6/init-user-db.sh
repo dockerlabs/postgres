@@ -13,6 +13,6 @@ set_postgresql_param "listen_addresses" "*" quiet
 case $REPLICATION_MODE in
   slave|snapshot|backup)
     gosu postgres pg_ctl -D "$PGDATA" -w start >/dev/null
-    cp /dev/null /docker-entrypoint-initdb.d/postgis.sh
+    rm /docker-entrypoint-initdb.d/postgis.sh
     ;;
 esac
