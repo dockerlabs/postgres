@@ -2,13 +2,14 @@
 set -e
 
 REPLICATION_PORT=${REPLICATION_PORT:-5432}
+DB_EXTENSION=${DB_EXTENSION:-postgis,hstore,uuid-ossp}
+
 
 case $REPLICATION_MODE in
   slave|snapshot|backup)
     pg_ctl -D "$PGDATA" -w stop >/dev/null
     export PGDATA="$PGDATA/../replica"
     mkdir -p "$PGDATA"
-    chown postgres "$PGDATA"
     chmod 700 "$PGDATA"
     ;;
 esac
@@ -112,6 +113,13 @@ create_replication_user() {
   fi
 }
 
+load_extensions() {
+  for extension in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${DB_EXTENSION}"); do
+    echo "‣ Loading ${extension} extension..."
+    psql -U ${POSTGRES_USER} -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS ${extension};" >/dev/null 2>&1
+  done
+}
+
 create_database() {
   if [[ -n ${DB_NAME} ]]; then
     echo "Loading $DB_NAME database"
@@ -121,11 +129,10 @@ create_database() {
         CREATE DATABASE $DB_NAME;
         GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
         GRANT postgres to $DB_USER;
-        \c $DB_NAME
-        CREATE EXTENSION "hstore";
-        CREATE EXTENSION "postgis";
-        CREATE EXTENSION "uuid-ossp";
 EOSQL
+
+  load_extensions
+
   fi
 }
 
@@ -152,11 +159,13 @@ initialize_database() {
           PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
             -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X stream -w >/dev/null
           ;;
+
         snapshot)
           echo "* Generating a snapshot data on $REPLICATION_HOST..."
           PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
             -h ${REPLICATION_HOST} -p ${REPLICATION_PORT} -U ${REPLICATION_USER} -X fetch -w >/dev/null
           ;;
+
         backup)
           echo "* Backing up data on $REPLICATION_HOST..."
           PGPASSWORD=$REPLICATION_PASS pg_basebackup -D ${PGDATA} \
