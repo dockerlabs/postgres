@@ -12,7 +12,7 @@ sudo docker run --name pg.master -itd --restart always \
     --env 'DB_NAME=mydb' \
     --env 'DB_USER=me' \
     --env 'DB_PASS=db-pass' \
-    --env 'DB_EXTENSION:postgis,hstore,uuid-ossp' \
+    --env 'DB_EXTENSION=postgis,hstore,uuid-ossp' \
     mongkok/postgres:9.6
 ```
 
