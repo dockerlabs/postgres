@@ -116,7 +116,7 @@ create_replication_user() {
 load_extensions() {
   for extension in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${DB_EXTENSION}"); do
     echo "‣ Loading ${extension} extension..."
-    psql -U ${POSTGRES_USER} -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS ${extension};" >/dev/null 2>&1
+    psql -U ${POSTGRES_USER} -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS \"${extension}\";" >/dev/null 2>&1
   done
 }
 
