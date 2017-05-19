@@ -9,10 +9,10 @@ Start PostgreSQL creating database user:
 ```sh
 sudo docker run --name pg.master -itd --restart always \
     --env 'POSTGRES_PASSWORD=pass' \
-    --env 'DB_NAME=mydb' \
-    --env 'DB_USER=me' \
-    --env 'DB_PASS=db-pass' \
-    --env 'DB_EXTENSION=postgis,hstore,uuid-ossp' \
+    --env 'POSTGRES_DB_NAME=mydb' \
+    --env 'POSTGRES_DB_USER=me' \
+    --env 'POSTGRES_DB_PASS=db-pass' \
+    --env 'POSTGRES_DB_EXTENSION=postgis,hstore,uuid-ossp' \
     mongkok/postgres:9.6
 ```
 

@@ -2,7 +2,7 @@
 set -e
 
 REPLICATION_PORT=${REPLICATION_PORT:-5432}
-DB_EXTENSION=${DB_EXTENSION:-postgis,hstore,uuid-ossp}
+POSTGRES_DB_EXTENSION=${POSTGRES_DB_EXTENSION:-postgis,hstore,uuid-ossp}
 
 
 case $REPLICATION_MODE in
@@ -114,21 +114,21 @@ create_replication_user() {
 }
 
 load_extensions() {
-  for extension in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${DB_EXTENSION}"); do
+  for extension in $(awk -F',' '{for (i = 1 ; i <= NF ; i++) print $i}' <<< "${POSTGRES_DB_EXTENSION}"); do
     echo "‣ Loading ${extension} extension..."
-    psql -U ${POSTGRES_USER} -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS \"${extension}\";" >/dev/null 2>&1
+    psql -U ${POSTGRES_USER} -d ${POSTGRES_DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS \"${extension}\";" >/dev/null 2>&1
   done
 }
 
 create_database() {
-  if [[ -n ${DB_NAME} ]]; then
-    echo "Loading $DB_NAME database"
+  if [[ -n ${POSTGRES_DB_NAME} ]]; then
+    echo "Loading $POSTGRES_DB_NAME database"
 
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
-        CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASSWORD';
-        CREATE DATABASE $DB_NAME;
-        GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
-        GRANT postgres to $DB_USER;
+        CREATE ROLE $POSTGRES_DB_USER LOGIN PASSWORD '$POSTGRES_DB_PASSWORD';
+        CREATE DATABASE $POSTGRES_DB_NAME;
+        GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB_NAME TO $POSTGRES_DB_USER;
+        GRANT postgres to $POSTGRES_DB_USER;
 EOSQL
 
   load_extensions
