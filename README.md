@@ -13,7 +13,7 @@ sudo docker run --name pg.master -itd --restart always \
     --env 'POSTGRES_DB_USER=me' \
     --env 'POSTGRES_DB_PASS=db-pass' \
     --env 'POSTGRES_DB_EXTENSION=postgis,hstore,uuid-ossp' \
-    mongkok/postgres:9.6
+    mongkok/postgres:10
 ```
 
 
@@ -24,7 +24,7 @@ sudo docker run --name pg.master -itd --restart always \
 sudo docker run --name pg.master -itd --restart always \
     --env 'REPLICATION_USER=replication-user' \
     --env 'REPLICATION_PASS=replication-pass' \
-    mongkok/postgres:9.6
+    mongkok/postgres:10
 ```
 
 
@@ -38,7 +38,7 @@ docker run --name pg.slave -itd --restart always \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
     --env 'REPLICATION_PASS=replication-pass' \
-    mongkok/postgres:9.6
+    mongkok/postgres:10
 ```
 
 ### Creating a snapshot
@@ -51,7 +51,7 @@ docker run --name pg.snapshot -itd --restart always \
     --env 'REPLICATION_PORT=5432' \
     --env 'REPLICATION_USER=replication-user' \
     --env 'REPLICATION_PASS=replication-pass' \
-    mongkok/postgres:9.6
+    mongkok/postgres:10
 ```
 
 ### Creating a backup
@@ -65,7 +65,7 @@ docker run --name pg.backup -it --rm \
     --env 'REPLICATION_USER=replication-user' \
     --env 'REPLICATION_PASS=replication-pass' \
     --volume /path/to/postgresql.$(date +%Y%m%d%H%M%S):/var/lib/postgresql/replica \
-    mongkok/postgres:9.6
+    mongkok/postgres:10
 ```
 
 ### Inspiration
